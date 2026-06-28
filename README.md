@@ -44,11 +44,32 @@ synthetic experiment ─► per-arm conversions & revenue
         └─ Design ──────► sample size · power · minimum detectable effect
 ```
 
+## Beyond the basic A/B test
+
+Two upgrades (in `src/sequential.py`) take this past a single fixed-horizon test:
+
+- **Always-valid confidence sequences** (`always_valid_ci`) — an interval you can
+  inspect after *every* visitor and stop the moment it excludes your null, without
+  inflating the false-positive rate. This is the principled answer to "can I peek?".
+  The cost of anytime-validity is a wider interval than the fixed-`n` Wald CI.
+- **Multi-variant testing with Holm-Bonferroni** (`compare_variants`) — run A/B/C/…
+  against a control while controlling the family-wise error rate, so five variants
+  don't silently turn a 5% error budget into ~23%.
+
+```python
+from src.sequential import always_valid_ci, compare_variants
+always_valid_ci(120, 1000)                       # (lo, hi) — safe to peek
+compare_variants((100, 2000), {"B": (180, 2000), "C": (105, 2000)})
+```
+
 ## Tech stack
 
 - **Stats:** SciPy (`norm`, `t`, `beta`, `ttest_ind`), NumPy, pandas
 - **App:** Streamlit (result analyser + experiment-design calculator)
-- **Tests:** pytest (16 tests, including power/sample-size self-consistency checks)
+- **Sequential / multi-arm:** asymptotic confidence sequences + Holm-Bonferroni
+- **Observability:** structured logging via `src/logging_utils.py` (`LOG_LEVEL` env)
+- **Deploy:** `Dockerfile` + `docker-compose.yml`; GitHub Actions CI runs the suite
+- **Tests:** pytest (25 tests, including power/sample-size self-consistency, confidence-sequence width, and multiplicity correction)
 
 ## Setup & run
 
@@ -73,9 +94,14 @@ pytest -q                      # run tests
 │   ├── generate_data.py    # synthetic two-arm experiment
 │   ├── frequentist.py      # z-test, t-test, CIs, power, sample size, MDE
 │   ├── bayesian.py         # Beta-Binomial: P(B>A), uplift, expected loss
+│   ├── sequential.py       # always-valid confidence sequences + Holm multi-arm
 │   ├── experiment.py       # end-to-end report from a data frame
+│   ├── logging_utils.py    # structured logging + timing
 │   └── run_analysis.py     # CLI report + ship/no-ship verdict
-├── tests/                  # 16 pytest tests
+├── tests/                  # 25 pytest tests
+├── Dockerfile              # containerised Streamlit app
+├── docker-compose.yml
+├── .github/workflows/ci.yml
 ├── .env.example
 ├── requirements.txt
 └── .gitignore
@@ -83,8 +109,6 @@ pytest -q                      # run tests
 
 ## Possible extensions
 
-- **Sequential / always-valid testing** (mSPRT, group-sequential boundaries) so you *can* peek safely.
-- **Multiple variants** with multiple-comparison correction (Bonferroni / Holm) or a Bayesian multi-arm model.
 - **CUPED variance reduction** using pre-experiment covariates to reach significance with fewer users.
 - **Segmentation / heterogeneous treatment effects** (does B help new users but hurt returning ones?).
 - **Ratio & count metrics** (revenue-per-user with the delta method, Poisson tests).

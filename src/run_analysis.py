@@ -13,12 +13,21 @@ from .config import get_settings
 from .experiment import analyze
 from .frequentist import minimum_detectable_effect, sample_size_proportion
 from .generate_data import generate
+from .logging_utils import get_logger, log_timing
+from .sequential import always_valid_ci
+
+log = get_logger(__name__)
 
 
 def run() -> dict:
     settings = get_settings()
+    log.info(
+        "Analysing experiment: %d/arm, baseline=%.3f, alpha=%.3f",
+        settings.n_per_arm, settings.baseline_rate, settings.alpha,
+    )
     df = generate(settings)
-    report = analyze(df, settings=settings)
+    with log_timing(log, "frequentist + Bayesian analysis"):
+        report = analyze(df, settings=settings)
 
     # Planning context: what we *could* have detected, and what we'd need.
     planning = {
@@ -35,7 +44,18 @@ def run() -> dict:
         ),
     }
 
-    out = {"report": report.as_dict(), "planning": planning}
+    # Anytime-valid CIs: safe to inspect mid-experiment without inflating error.
+    ctrl = df[df["group"] == "control"]
+    trt = df[df["group"] == "treatment"]
+    anytime = {
+        "control_cs": [round(x, 5) for x in always_valid_ci(
+            int(ctrl["converted"].sum()), len(ctrl), settings.alpha)],
+        "treatment_cs": [round(x, 5) for x in always_valid_ci(
+            int(trt["converted"].sum()), len(trt), settings.alpha)],
+        "note": "Confidence sequences — valid even if you peek after every visitor.",
+    }
+
+    out = {"report": report.as_dict(), "planning": planning, "anytime_valid": anytime}
 
     os.makedirs(settings.data_dir, exist_ok=True)
     with open(os.path.join(settings.data_dir, "report.json"), "w") as fh:

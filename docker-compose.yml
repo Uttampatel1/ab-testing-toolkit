@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    image: ab-testing-toolkit:latest
+    container_name: ab-testing-toolkit
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    restart: unless-stopped
