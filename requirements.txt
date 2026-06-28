@@ -1,0 +1,14 @@
+# Data / stats
+numpy>=1.26,<3.0
+pandas==2.3.3
+scipy==1.14.1
+
+# Viz / dashboard
+matplotlib==3.9.2
+streamlit==1.41.1
+
+# Config
+python-dotenv==1.0.1
+
+# Dev / tests
+pytest==8.3.4

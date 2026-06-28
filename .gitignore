@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+data/
+*.csv
+*.png
+*.json
+.pytest_cache/
+.ipynb_checkpoints/
+*.log
