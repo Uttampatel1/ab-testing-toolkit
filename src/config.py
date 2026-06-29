@@ -28,6 +28,8 @@ class Settings:
     # Mean order value per converting user (for the revenue metric).
     aov_control: float = float(_get("AOV_CONTROL", "60.0"))
     aov_treatment: float = float(_get("AOV_TREATMENT", "61.0"))
+    # Mean pre-experiment spend (a pre-period covariate used for CUPED).
+    pre_aov: float = float(_get("PRE_AOV", "50.0"))
 
     # Analysis settings.
     alpha: float = float(_get("ALPHA", "0.05"))   # significance level

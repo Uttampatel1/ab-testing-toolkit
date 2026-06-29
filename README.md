@@ -79,14 +79,37 @@ always_valid_ci(120, 1000)                       # (lo, hi) — safe to peek
 compare_variants((100, 2000), {"B": (180, 2000), "C": (105, 2000)})
 ```
 
+## What top experimentation teams add: CUPED + an SRM guardrail
+
+- **CUPED variance reduction** (`src/cuped.py`) — uses a *pre-experiment* covariate
+  (here each visitor's prior spend) to subtract off variance the covariate already
+  explains: `Y_cuped = Y − θ·(X − X̄)`. Because the covariate is measured before
+  assignment, the effect estimate stays unbiased while the CI tightens. On the
+  synthetic revenue metric it removes **~7.6% of variance** (95% CI width 2.37 → 2.28)
+  — free power, same traffic. Real metrics with a strong pre-period signal routinely
+  see 30–50%.
+- **Sample-Ratio-Mismatch guardrail** (`src/srm.py`) — a chi-square check that the
+  arms are the size you intended. A 50/50 design that logs **52k vs 48k** yields
+  `p ≈ 1e-36`: the randomiser or logging is broken and **every** downstream p-value is
+  void. This runs *before* you read the result, at a strict `α = 0.001` so it never
+  cries wolf.
+
+```python
+from src.cuped import cuped_welch_ttest
+from src.srm import srm_test
+srm_test([52000, 48000]).passed            # False — mismatch, don't trust the test
+cuped_welch_ttest(a_rev, a_pre, b_rev, b_pre).variance_reduction   # e.g. 0.076
+```
+
 ## Tech stack
 
 - **Stats:** SciPy (`norm`, `t`, `beta`, `ttest_ind`), NumPy, pandas
 - **App:** Streamlit (result analyser + experiment-design calculator)
 - **Sequential / multi-arm:** asymptotic confidence sequences + Holm-Bonferroni
+- **Variance reduction / guardrails:** CUPED + Sample-Ratio-Mismatch test
 - **Observability:** structured logging via `src/logging_utils.py` (`LOG_LEVEL` env)
 - **Deploy:** `Dockerfile` + `docker-compose.yml`; GitHub Actions CI runs the suite
-- **Tests:** pytest (25 tests, including power/sample-size self-consistency, confidence-sequence width, and multiplicity correction)
+- **Tests:** pytest (36 tests, including power/sample-size self-consistency, confidence-sequence width, multiplicity correction, CUPED variance reduction, and SRM detection)
 
 ## Setup & run
 
@@ -112,10 +135,12 @@ pytest -q                      # run tests
 │   ├── frequentist.py      # z-test, t-test, CIs, power, sample size, MDE
 │   ├── bayesian.py         # Beta-Binomial: P(B>A), uplift, expected loss
 │   ├── sequential.py       # always-valid confidence sequences + Holm multi-arm
+│   ├── cuped.py            # CUPED variance reduction (pre-experiment covariate)
+│   ├── srm.py              # Sample-Ratio-Mismatch chi-square guardrail
 │   ├── experiment.py       # end-to-end report from a data frame
 │   ├── logging_utils.py    # structured logging + timing
 │   └── run_analysis.py     # CLI report + ship/no-ship verdict
-├── tests/                  # 25 pytest tests
+├── tests/                  # 36 pytest tests
 ├── Dockerfile              # containerised Streamlit app
 ├── docker-compose.yml
 ├── .github/workflows/ci.yml
@@ -126,7 +151,6 @@ pytest -q                      # run tests
 
 ## Possible extensions
 
-- **CUPED variance reduction** using pre-experiment covariates to reach significance with fewer users.
 - **Segmentation / heterogeneous treatment effects** (does B help new users but hurt returning ones?).
 - **Ratio & count metrics** (revenue-per-user with the delta method, Poisson tests).
 ```

@@ -22,14 +22,30 @@ def generate(settings: Settings | None = None) -> pd.DataFrame:
 
     def arm(group: str, rate: float, aov: float) -> pd.DataFrame:
         n = settings.n_per_arm
-        converted = rng.random(n) < rate
+        # Latent per-visitor "spend propensity" (mean 1). It drives both the
+        # pre-experiment covariate and in-experiment revenue, so the covariate is
+        # predictive — which is exactly what CUPED exploits to cut variance.
+        latent = rng.gamma(shape=4.0, scale=1.0 / 4.0, size=n)
+        pre_revenue = np.clip(
+            latent * settings.pre_aov + rng.normal(0.0, settings.pre_aov * 0.15, n),
+            0.0, None,
+        )
+
+        # High-propensity visitors both convert more and spend more, so the
+        # pre-period covariate predicts conversion too. Weights are normalised to
+        # mean 1 so the per-arm conversion rate stays at the configured `rate`.
+        weight = latent ** 0.8
+        weight = weight / weight.mean()
+        p_convert = np.clip(rate * weight, 0.0, 0.99)
+        converted = rng.random(n) < p_convert
         # Revenue is positive only for converters; gamma keeps it non-negative.
         revenue = np.where(
-            converted, rng.gamma(shape=4.0, scale=aov / 4.0, size=n), 0.0
+            converted, latent * rng.gamma(shape=4.0, scale=aov / 4.0, size=n), 0.0
         )
         return pd.DataFrame(
             {"group": group, "converted": converted.astype(int),
-             "revenue": np.round(revenue, 2)}
+             "revenue": np.round(revenue, 2),
+             "pre_revenue": np.round(pre_revenue, 2)}
         )
 
     control = arm("control", settings.baseline_rate, settings.aov_control)
