@@ -6,6 +6,23 @@ This toolkit answers all of that with **both** a frequentist and a Bayesian lens
 
 ---
 
+<!-- portfolio-visuals -->
+
+## 🔧 How it works
+
+![A/B Testing Toolkit — architecture & data flow](./architecture.svg)
+
+*End-to-end flow from input to output — see [`architecture.svg`](./architecture.svg).*
+
+## 📊 Live dashboard
+
+![A/B Testing Toolkit — interactive Streamlit dashboard](./dashboard.png)
+
+*Real screenshot of the Streamlit app on synthetic data — no API key needed. Run it with `streamlit run dashboard.py`.*
+
+---
+
+
 ## Key result (synthetic experiment: 5,000 visitors/arm)
 
 | | Control | Treatment | Lift |
